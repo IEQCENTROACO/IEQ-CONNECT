@@ -1,0 +1,7 @@
+{
+  "name": "IEQ CONNECT",
+  "description": "Um aplicativo completo para gestão de visitantes da IEQ, com lembretes de aniversário, integração com WhatsApp e agenda de eventos.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
