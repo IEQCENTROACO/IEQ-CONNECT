@@ -151,13 +151,16 @@ const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddV
           <div className="space-y-4">
             {events.map(e => (
               <div key={e.id} className="flex items-start gap-4 p-4 hover:bg-slate-50 rounded-2xl transition-all border border-transparent hover:border-slate-100">
-                <div className="bg-blue-100 text-blue-700 p-2 rounded-xl font-bold min-w-[85px] text-center flex flex-col justify-center">
+                <div className="bg-blue-100 text-blue-700 p-2 rounded-xl font-bold min-w-[85px] text-center flex flex-col justify-center shadow-sm">
                   <p className="text-[10px] uppercase border-b border-blue-200 mb-1">{e.dayOfWeek.substring(0, 3)}</p>
                   <p className="text-sm leading-tight">{e.time}</p>
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-bold text-slate-800 text-sm">{e.title}</h4>
-                  <p className="text-xs text-slate-500 line-clamp-2">{e.description}</p>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-lg">{e.icon || '⛪'}</span>
+                    <h4 className="font-bold text-slate-800 text-sm">{e.title}</h4>
+                  </div>
+                  <p className="text-xs text-slate-500 line-clamp-2 italic">{e.description}</p>
                 </div>
               </div>
             ))}

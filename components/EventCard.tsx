@@ -19,6 +19,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, onEdit, onDelete }) => {
   };
 
   const theme = getTheme(event.title);
+  const displayIcon = event.icon || theme.icon;
 
   return (
     <div className="group relative bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
@@ -50,9 +51,14 @@ const EventCard: React.FC<EventCardProps> = ({ event, onEdit, onDelete }) => {
           </div>
         </div>
 
-        <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-blue-700 transition-colors">
-          {event.title}
-        </h3>
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-3xl filter drop-shadow-sm group-hover:scale-110 transition-transform">
+            {displayIcon}
+          </span>
+          <h3 className="text-xl font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
+            {event.title}
+          </h3>
+        </div>
         
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2 py-1 rounded-lg text-sm font-bold border border-blue-100">
@@ -67,15 +73,9 @@ const EventCard: React.FC<EventCardProps> = ({ event, onEdit, onDelete }) => {
           )}
         </div>
 
-        <p className="text-sm text-slate-500 leading-relaxed italic">
+        <p className="text-sm text-slate-500 leading-relaxed italic border-t border-slate-50 pt-4">
           "{event.description}"
         </p>
-
-        <div className="mt-4 flex justify-end">
-           <span className="text-3xl filter grayscale group-hover:grayscale-0 transition-all duration-300">
-            {theme.icon}
-          </span>
-        </div>
       </div>
 
       <div className={`h-1 w-0 group-hover:w-full transition-all duration-500 ${theme.color} absolute bottom-0`} />

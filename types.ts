@@ -30,6 +30,7 @@ export interface ChurchEvent {
   time: string;
   secondaryTime?: string;
   description: string;
+  icon?: string;
 }
 
 export type View = 'dashboard' | 'visitors' | 'members' | 'events' | 'birthdays' | 'users';

@@ -8,13 +8,16 @@ interface EventFormProps {
   initialData?: ChurchEvent;
 }
 
+const EVENT_ICONS = ['⛪', '📖', '🙏', '⚡', '🏠', '🍴', '🕊️', '🎼', '🎓', '🛡️', '❤️', '🔥'];
+
 const EventForm: React.FC<EventFormProps> = ({ onSave, onCancel, initialData }) => {
   const [formData, setFormData] = useState({
     title: '',
     dayOfWeek: 'Domingo',
     time: '',
     secondaryTime: '',
-    description: ''
+    description: '',
+    icon: '⛪'
   });
   const [hasSecondaryTime, setHasSecondaryTime] = useState(false);
 
@@ -25,7 +28,8 @@ const EventForm: React.FC<EventFormProps> = ({ onSave, onCancel, initialData }) 
         dayOfWeek: initialData.dayOfWeek,
         time: initialData.time,
         secondaryTime: initialData.secondaryTime || '',
-        description: initialData.description
+        description: initialData.description,
+        icon: initialData.icon || '⛪'
       });
       setHasSecondaryTime(!!initialData.secondaryTime);
     }
@@ -69,6 +73,26 @@ const EventForm: React.FC<EventFormProps> = ({ onSave, onCancel, initialData }) 
               value={formData.title}
               onChange={e => setFormData({ ...formData, title: e.target.value })}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-3">Escolha um Ícone</label>
+            <div className="flex flex-wrap gap-2">
+              {EVENT_ICONS.map(icon => (
+                <button
+                  key={icon}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, icon })}
+                  className={`w-10 h-10 flex items-center justify-center rounded-xl text-xl transition-all ${
+                    formData.icon === icon 
+                    ? 'bg-indigo-100 border-2 border-indigo-600 scale-110' 
+                    : 'bg-slate-50 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>
