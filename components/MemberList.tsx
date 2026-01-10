@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Member, ChurchEvent } from '../types';
 import { whatsappService } from '../services/whatsappService';
 
@@ -11,7 +11,14 @@ interface MemberListProps {
 }
 
 const MemberList: React.FC<MemberListProps> = ({ members, events, onDelete, onSendBirthday }) => {
+  const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const todayISO = new Date().toISOString().split('T')[0];
+
+  const handleSendAgenda = (member: Member) => {
+    whatsappService.sendWelcomeMessage(member, events);
+    setFeedbackId(member.id + '_agenda');
+    setTimeout(() => setFeedbackId(null), 2000);
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -35,11 +42,13 @@ const MemberList: React.FC<MemberListProps> = ({ members, events, onDelete, onSe
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {members.map(member => {
             const alreadySent = member.lastBirthdayWishedAt === todayISO;
+            const isAgendaSent = feedbackId === member.id + '_agenda';
+
             return (
-              <div key={member.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl transition-all group">
+              <div key={member.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border transition-all group ${isAgendaSent ? 'animate-glow border-indigo-400' : 'border-slate-100 hover:shadow-xl'}`}>
                 <div className="flex justify-between items-start mb-4">
-                  <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-xl font-black group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                    {member.name.charAt(0)}
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black transition-colors ${isAgendaSent ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
+                    {isAgendaSent ? '📅' : member.name.charAt(0)}
                   </div>
                   <button 
                      onClick={() => onDelete(member.id)}
@@ -64,10 +73,15 @@ const MemberList: React.FC<MemberListProps> = ({ members, events, onDelete, onSe
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => whatsappService.sendWelcomeMessage(member, events)}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-xs font-black uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100"
+                    onClick={() => handleSendAgenda(member)}
+                    className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition-all flex items-center justify-center gap-2 shadow-lg ${
+                      isAgendaSent 
+                      ? 'bg-indigo-700 text-white animate-success' 
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100'
+                    }`}
                   >
-                    <span>📅</span> Agenda
+                    <span>{isAgendaSent ? '✅' : '📅'}</span>
+                    <span>{isAgendaSent ? 'Enviado!' : 'Agenda'}</span>
                   </button>
                   <button
                     disabled={alreadySent}

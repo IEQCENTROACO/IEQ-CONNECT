@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Visitor, ChurchEvent } from '../types';
 import { whatsappService } from '../services/whatsappService';
 
@@ -11,7 +11,14 @@ interface VisitorListProps {
 }
 
 const VisitorList: React.FC<VisitorListProps> = ({ visitors, events, onDelete, onSendBirthday }) => {
+  const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const todayISO = new Date().toISOString().split('T')[0];
+
+  const handleWelcome = (visitor: Visitor) => {
+    whatsappService.sendWelcomeMessage(visitor, events);
+    setFeedbackId(visitor.id + '_welcome');
+    setTimeout(() => setFeedbackId(null), 2000);
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -35,11 +42,13 @@ const VisitorList: React.FC<VisitorListProps> = ({ visitors, events, onDelete, o
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {visitors.map(visitor => {
             const alreadySent = visitor.lastBirthdayWishedAt === todayISO;
+            const isSentSuccess = feedbackId === visitor.id + '_welcome';
+
             return (
-              <div key={visitor.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl transition-all group">
+              <div key={visitor.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border transition-all group ${isSentSuccess ? 'animate-glow border-green-500 shadow-lg shadow-green-50' : 'border-slate-100 hover:shadow-xl'}`}>
                 <div className="flex justify-between items-start mb-4">
-                  <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-xl font-black group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    {visitor.name.charAt(0)}
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black transition-colors ${isSentSuccess ? 'bg-green-500 text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
+                    {isSentSuccess ? '✅' : visitor.name.charAt(0)}
                   </div>
                   <button 
                      onClick={() => onDelete(visitor.id)}
@@ -65,10 +74,15 @@ const VisitorList: React.FC<VisitorListProps> = ({ visitors, events, onDelete, o
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => whatsappService.sendWelcomeMessage(visitor, events)}
-                    className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl text-xs font-black uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-100"
+                    onClick={() => handleWelcome(visitor)}
+                    className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition-all flex items-center justify-center gap-2 shadow-lg ${
+                      isSentSuccess 
+                      ? 'bg-green-600 text-white animate-success' 
+                      : 'bg-green-500 hover:bg-green-600 text-white shadow-green-100'
+                    }`}
                   >
-                    <span>🙏</span> Agradecer
+                    <span>{isSentSuccess ? '✅' : '🙏'}</span>
+                    <span>{isSentSuccess ? 'Enviado!' : 'Agradecer'}</span>
                   </button>
                   <button
                     disabled={alreadySent}

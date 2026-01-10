@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Visitor, Member, ChurchEvent, Person } from '../types';
 import { whatsappService } from '../services/whatsappService';
 
@@ -13,6 +13,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddVisitor, onAddMember, onSendBirthday }) => {
+  const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const today = new Date();
   const currentDay = today.getDate();
   const currentMonth = today.getMonth();
@@ -33,6 +34,12 @@ const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddV
       .sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime())
       .slice(0, 3);
   }, [visitors]);
+
+  const handleAgradecer = (v: Visitor) => {
+    whatsappService.sendWelcomeMessage(v, events);
+    setFeedbackId(v.id);
+    setTimeout(() => setFeedbackId(null), 2000);
+  };
 
   const totalVisitorsThisMonth = useMemo(() => {
     return visitors.filter(v => {
@@ -84,7 +91,7 @@ const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddV
                   const alreadySent = v.lastBirthdayWishedAt === todayISO;
                   const isMember = members.some(m => m.id === v.id);
                   return (
-                    <div key={v.id} className={`flex items-center justify-between p-4 rounded-2xl border ${isMember ? 'bg-indigo-50 border-indigo-100' : 'bg-amber-50 border-amber-100'}`}>
+                    <div key={v.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${isMember ? 'bg-indigo-50 border-indigo-100' : 'bg-amber-50 border-amber-100'}`}>
                       <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${isMember ? 'bg-indigo-200 text-indigo-700' : 'bg-amber-200 text-amber-700'}`}>
                           {v.name.charAt(0)}
@@ -118,25 +125,32 @@ const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddV
             </h3>
             {recentVisitors.length > 0 ? (
               <div className="space-y-3">
-                {recentVisitors.map(v => (
-                  <div key={v.id} className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl border border-slate-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-700 font-bold">
-                        {v.name.charAt(0)}
+                {recentVisitors.map(v => {
+                  const isSuccess = feedbackId === v.id;
+                  return (
+                    <div key={v.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${isSuccess ? 'bg-green-50 border-green-200 animate-glow' : 'hover:bg-slate-50 border-transparent hover:border-slate-100'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-colors ${isSuccess ? 'bg-green-500 text-white' : 'bg-blue-100 text-blue-700'}`}>
+                          {isSuccess ? '✅' : v.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800 text-sm">{v.name}</p>
+                          <p className="text-[10px] text-slate-400 uppercase font-bold">Visitou em {new Date(v.registrationDate).toLocaleDateString('pt-BR')}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-800 text-sm">{v.name}</p>
-                        <p className="text-[10px] text-slate-400 uppercase font-bold">Visitou em {new Date(v.registrationDate).toLocaleDateString('pt-BR')}</p>
-                      </div>
+                      <button
+                        onClick={() => handleAgradecer(v)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                          isSuccess 
+                          ? 'bg-green-600 text-white border-green-600 animate-success' 
+                          : 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-700 hover:text-white'
+                        }`}
+                      >
+                        {isSuccess ? 'Enviado!' : 'Agradecer'}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => whatsappService.sendWelcomeMessage(v, events)}
-                      className="bg-blue-50 text-blue-700 hover:bg-blue-700 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-blue-100"
-                    >
-                      Agradecer
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-center py-6 text-slate-400 text-sm">Nenhum visitante recente.</p>
