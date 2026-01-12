@@ -70,6 +70,11 @@ const VisitorList: React.FC<VisitorListProps> = ({ visitors, events, onDelete, o
                   <p className="text-xs text-slate-400 flex items-center gap-2 italic">
                     <span className="opacity-50">📍</span> {visitor.address || 'Endereço não informado'}
                   </p>
+                  <div className="pt-2 mt-2 border-t border-slate-50">
+                    <p className="text-[10px] text-slate-400 flex items-center gap-2 font-medium">
+                      <span className="opacity-50">📝</span> Cadastrado em: {new Date(visitor.registrationDate).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
