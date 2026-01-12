@@ -1,7 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
 import { Visitor, Member, ChurchEvent, Person } from '../types';
-import { whatsappService } from '../services/whatsappService';
 
 interface DashboardProps {
   visitors: Visitor[];
@@ -10,9 +9,10 @@ interface DashboardProps {
   onAddVisitor: () => void;
   onAddMember: () => void;
   onSendBirthday: (person: Person) => void;
+  onSendWelcome: (person: Person) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddVisitor, onAddMember, onSendBirthday }) => {
+const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddVisitor, onAddMember, onSendBirthday, onSendWelcome }) => {
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const today = new Date();
   const currentDay = today.getDate();
@@ -36,7 +36,7 @@ const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddV
   }, [visitors]);
 
   const handleAgradecer = (v: Visitor) => {
-    whatsappService.sendWelcomeMessage(v, events);
+    onSendWelcome(v);
     setFeedbackId(v.id);
     setTimeout(() => setFeedbackId(null), 2000);
   };
@@ -98,7 +98,10 @@ const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddV
                         </div>
                         <div>
                           <p className="font-bold text-slate-800 text-sm">{v.name}</p>
-                          <p className="text-[10px] uppercase font-bold opacity-60">{isMember ? 'Membro' : 'Visitante'}</p>
+                          <p className="text-[10px] uppercase font-bold opacity-60">
+                            {isMember ? 'Membro' : 'Visitante'} 
+                            {v.lastBirthdayWishedAt && <span className="text-green-600 ml-2">• Enviado ✅</span>}
+                          </p>
                         </div>
                       </div>
                       <button
@@ -127,6 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddV
               <div className="space-y-3">
                 {recentVisitors.map(v => {
                   const isSuccess = feedbackId === v.id;
+                  const alreadySentWelcome = v.lastWelcomeSentAt === todayISO;
                   return (
                     <div key={v.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${isSuccess ? 'bg-green-50 border-green-200 animate-glow' : 'hover:bg-slate-50 border-transparent hover:border-slate-100'}`}>
                       <div className="flex items-center gap-3">
@@ -135,18 +139,21 @@ const Dashboard: React.FC<DashboardProps> = ({ visitors, members, events, onAddV
                         </div>
                         <div>
                           <p className="font-bold text-slate-800 text-sm">{v.name}</p>
-                          <p className="text-[10px] text-slate-400 uppercase font-bold">Visitou em {new Date(v.registrationDate).toLocaleDateString('pt-BR')}</p>
+                          <p className="text-[10px] text-slate-400 uppercase font-bold">
+                            Visitou em {new Date(v.registrationDate).toLocaleDateString('pt-BR')}
+                            {v.lastWelcomeSentAt && <span className="text-green-600 ml-2">• Contato realizado ✅</span>}
+                          </p>
                         </div>
                       </div>
                       <button
                         onClick={() => handleAgradecer(v)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                          isSuccess 
-                          ? 'bg-green-600 text-white border-green-600 animate-success' 
+                          alreadySentWelcome || isSuccess
+                          ? 'bg-green-600 text-white border-green-600' 
                           : 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-700 hover:text-white'
                         }`}
                       >
-                        {isSuccess ? 'Enviado!' : 'Agradecer'}
+                        {isSuccess || alreadySentWelcome ? 'Enviado!' : 'Agradecer'}
                       </button>
                     </div>
                   );

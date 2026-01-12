@@ -1,13 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Visitor } from '../types';
 
 interface VisitorFormProps {
-  onSave: (visitor: Omit<Visitor, 'id' | 'registrationDate'>) => void;
+  onSave: (visitor: Omit<Visitor, 'id' | 'registrationDate'> | Visitor) => void;
   onCancel: () => void;
+  initialData?: Visitor;
 }
 
-const VisitorForm: React.FC<VisitorFormProps> = ({ onSave, onCancel }) => {
+const VisitorForm: React.FC<VisitorFormProps> = ({ onSave, onCancel, initialData }) => {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -15,18 +16,36 @@ const VisitorForm: React.FC<VisitorFormProps> = ({ onSave, onCancel }) => {
     address: ''
   });
 
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name,
+        phone: initialData.phone,
+        birthDate: initialData.birthDate,
+        address: initialData.address
+      });
+    }
+  }, [initialData]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.phone) return;
-    onSave(formData);
+    
+    if (initialData) {
+      onSave({ ...initialData, ...formData });
+    } else {
+      onSave(formData);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="bg-blue-700 p-6 text-white text-center">
-          <h3 className="text-2xl font-bold">Novo Visitante</h3>
-          <p className="text-blue-100 text-sm opacity-80">Preencha os dados para cadastro</p>
+          <h3 className="text-2xl font-bold">{initialData ? 'Editar Visitante' : 'Novo Visitante'}</h3>
+          <p className="text-blue-100 text-sm opacity-80">
+            {initialData ? 'Atualize os dados cadastrais' : 'Preencha os dados para cadastro'}
+          </p>
         </div>
         
         <form onSubmit={handleSubmit} className="p-8 space-y-5">
@@ -87,7 +106,7 @@ const VisitorForm: React.FC<VisitorFormProps> = ({ onSave, onCancel }) => {
               type="submit"
               className="flex-1 px-4 py-3 bg-blue-700 text-white font-bold rounded-xl shadow-lg hover:bg-blue-800 transition-colors shadow-blue-200"
             >
-              Cadastrar
+              {initialData ? 'Salvar Alterações' : 'Cadastrar'}
             </button>
           </div>
         </form>

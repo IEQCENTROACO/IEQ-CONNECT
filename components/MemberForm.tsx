@@ -1,13 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Member } from '../types';
 
 interface MemberFormProps {
-  onSave: (member: Omit<Member, 'id' | 'registrationDate'>) => void;
+  onSave: (member: Omit<Member, 'id' | 'registrationDate'> | Member) => void;
   onCancel: () => void;
+  initialData?: Member;
 }
 
-const MemberForm: React.FC<MemberFormProps> = ({ onSave, onCancel }) => {
+const MemberForm: React.FC<MemberFormProps> = ({ onSave, onCancel, initialData }) => {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -15,18 +16,36 @@ const MemberForm: React.FC<MemberFormProps> = ({ onSave, onCancel }) => {
     address: ''
   });
 
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name,
+        phone: initialData.phone,
+        birthDate: initialData.birthDate,
+        address: initialData.address
+      });
+    }
+  }, [initialData]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.phone) return;
-    onSave(formData);
+    
+    if (initialData) {
+      onSave({ ...initialData, ...formData });
+    } else {
+      onSave(formData);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="bg-indigo-700 p-6 text-white text-center">
-          <h3 className="text-2xl font-bold">Novo Membro IEQ</h3>
-          <p className="text-indigo-100 text-sm opacity-80">Cadastro de membros regulares</p>
+          <h3 className="text-2xl font-bold">{initialData ? 'Editar Membro' : 'Novo Membro IEQ'}</h3>
+          <p className="text-indigo-100 text-sm opacity-80">
+             {initialData ? 'Atualize o perfil do membro' : 'Cadastro de membros regulares'}
+          </p>
         </div>
         
         <form onSubmit={handleSubmit} className="p-8 space-y-5">
@@ -87,7 +106,7 @@ const MemberForm: React.FC<MemberFormProps> = ({ onSave, onCancel }) => {
               type="submit"
               className="flex-1 px-4 py-3 bg-indigo-700 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-800 transition-colors shadow-indigo-200"
             >
-              Cadastrar Membro
+              {initialData ? 'Salvar Alterações' : 'Cadastrar Membro'}
             </button>
           </div>
         </form>

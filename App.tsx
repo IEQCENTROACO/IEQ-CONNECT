@@ -23,7 +23,9 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [showVisitorForm, setShowVisitorForm] = useState(false);
+  const [editingVisitor, setEditingVisitor] = useState<Visitor | undefined>(undefined);
   const [showMemberForm, setShowMemberForm] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | undefined>(undefined);
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ChurchEvent | undefined>(undefined);
   const [initialized, setInitialized] = useState(false);
@@ -52,32 +54,56 @@ const App: React.FC = () => {
     setCurrentUser(null);
   };
 
-  const handleAddVisitor = (newVisitorData: Omit<Visitor, 'id' | 'registrationDate'>) => {
-    const newVisitor: Visitor = {
-      ...newVisitorData,
-      id: crypto.randomUUID(),
-      registrationDate: new Date().toISOString()
-    };
-    storageService.saveVisitor(newVisitor);
+  const handleSaveVisitor = (visitorData: Omit<Visitor, 'id' | 'registrationDate'> | Visitor) => {
+    if ('id' in visitorData) {
+      storageService.updateVisitor(visitorData as Visitor);
+    } else {
+      const newVisitor: Visitor = {
+        ...visitorData,
+        id: crypto.randomUUID(),
+        registrationDate: new Date().toISOString()
+      };
+      storageService.saveVisitor(newVisitor);
+      setTimeout(() => {
+        if (confirm(`Visitante ${newVisitor.name} cadastrado! Deseja enviar a mensagem de boas-vindas e agenda agora?`)) {
+          handleSendWelcome(newVisitor);
+        }
+      }, 500);
+    }
     setVisitors(storageService.getVisitors());
     setShowVisitorForm(false);
-    setTimeout(() => {
-      if (confirm(`Visitante ${newVisitor.name} cadastrado! Deseja enviar a mensagem de boas-vindas e agenda agora?`)) {
-        whatsappService.sendWelcomeMessage(newVisitor, events);
-      }
-    }, 500);
+    setEditingVisitor(undefined);
   };
 
-  const handleAddMember = (newMemberData: Omit<Member, 'id' | 'registrationDate'>) => {
-    const newMember: Member = {
-      ...newMemberData,
-      id: crypto.randomUUID(),
-      registrationDate: new Date().toISOString()
-    };
-    storageService.saveMember(newMember);
+  const handleSaveMember = (memberData: Omit<Member, 'id' | 'registrationDate'> | Member) => {
+    if ('id' in memberData) {
+      storageService.updateMember(memberData as Member);
+    } else {
+      const newMember: Member = {
+        ...memberData,
+        id: crypto.randomUUID(),
+        registrationDate: new Date().toISOString()
+      };
+      storageService.saveMember(newMember);
+      alert(`Membro ${newMember.name} cadastrado com sucesso!`);
+    }
     setMembers(storageService.getMembers());
     setShowMemberForm(false);
-    alert(`Membro ${newMember.name} cadastrado com sucesso!`);
+    setEditingMember(undefined);
+  };
+
+  const handleSendWelcome = (person: Person) => {
+    whatsappService.sendWelcomeMessage(person, events);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const updated = { ...person, lastWelcomeSentAt: todayStr };
+    
+    if (members.some(m => m.id === person.id)) {
+      storageService.updateMember(updated as Member);
+      setMembers(storageService.getMembers());
+    } else {
+      storageService.updateVisitor(updated as Visitor);
+      setVisitors(storageService.getVisitors());
+    }
   };
 
   const handleSendBirthdayMessage = (person: Person) => {
@@ -85,7 +111,6 @@ const App: React.FC = () => {
     const todayStr = new Date().toISOString().split('T')[0];
     const updated = { ...person, lastBirthdayWishedAt: todayStr };
     
-    // Check if it's a member or visitor to update the correct store
     if (members.some(m => m.id === person.id)) {
       storageService.updateMember(updated as Member);
       setMembers(storageService.getMembers());
@@ -137,23 +162,28 @@ const App: React.FC = () => {
           visitors={visitors} 
           members={members}
           events={events} 
-          onAddVisitor={() => setShowVisitorForm(true)} 
-          onAddMember={() => setShowMemberForm(true)}
+          onAddVisitor={() => { setEditingVisitor(undefined); setShowVisitorForm(true); }} 
+          onAddMember={() => { setEditingMember(undefined); setShowMemberForm(true); }}
           onSendBirthday={handleSendBirthdayMessage}
+          onSendWelcome={handleSendWelcome}
         />;
       case 'members':
         return <MemberList 
           members={members} 
           events={events} 
           onDelete={handleDeleteMember} 
+          onEdit={(m) => { setEditingMember(m); setShowMemberForm(true); }}
           onSendBirthday={handleSendBirthdayMessage}
+          onSendWelcome={handleSendWelcome}
         />;
       case 'visitors':
         return <VisitorList 
           visitors={visitors} 
           events={events} 
           onDelete={handleDeleteVisitor} 
+          onEdit={(v) => { setEditingVisitor(v); setShowVisitorForm(true); }}
           onSendBirthday={handleSendBirthdayMessage}
+          onSendWelcome={handleSendWelcome}
         />;
       case 'birthdays':
         return <BirthdayReminders 
@@ -194,9 +224,10 @@ const App: React.FC = () => {
           visitors={visitors} 
           members={members} 
           events={events} 
-          onAddVisitor={() => setShowVisitorForm(true)} 
-          onAddMember={() => setShowMemberForm(true)}
+          onAddVisitor={() => { setEditingVisitor(undefined); setShowVisitorForm(true); }} 
+          onAddMember={() => { setEditingMember(undefined); setShowMemberForm(true); }}
           onSendBirthday={handleSendBirthdayMessage} 
+          onSendWelcome={handleSendWelcome}
         />;
     }
   };
@@ -209,8 +240,8 @@ const App: React.FC = () => {
       onLogout={handleLogout}
     >
       {renderContent()}
-      {showVisitorForm && <VisitorForm onSave={handleAddVisitor} onCancel={() => setShowVisitorForm(false)} />}
-      {showMemberForm && <MemberForm onSave={handleAddMember} onCancel={() => setShowMemberForm(false)} />}
+      {showVisitorForm && <VisitorForm onSave={handleSaveVisitor} onCancel={() => { setShowVisitorForm(false); setEditingVisitor(undefined); }} initialData={editingVisitor} />}
+      {showMemberForm && <MemberForm onSave={handleSaveMember} onCancel={() => { setShowMemberForm(false); setEditingMember(undefined); }} initialData={editingMember} />}
       {showEventForm && <EventForm onSave={handleSaveEvent} onCancel={() => { setShowEventForm(false); setEditingEvent(undefined); }} initialData={editingEvent} />}
     </Layout>
   );

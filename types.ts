@@ -18,6 +18,7 @@ export interface Person {
   address: string;
   registrationDate: string;
   lastBirthdayWishedAt?: string;
+  lastWelcomeSentAt?: string; // ISO format YYYY-MM-DD
 }
 
 export interface Visitor extends Person {}

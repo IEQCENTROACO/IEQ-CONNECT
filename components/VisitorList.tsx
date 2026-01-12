@@ -1,23 +1,30 @@
 
 import React, { useState } from 'react';
 import { Visitor, ChurchEvent } from '../types';
-import { whatsappService } from '../services/whatsappService';
 
 interface VisitorListProps {
   visitors: Visitor[];
   events: ChurchEvent[];
   onDelete: (id: string) => void;
+  onEdit: (visitor: Visitor) => void;
   onSendBirthday: (visitor: Visitor) => void;
+  onSendWelcome: (visitor: Visitor) => void;
 }
 
-const VisitorList: React.FC<VisitorListProps> = ({ visitors, events, onDelete, onSendBirthday }) => {
+const VisitorList: React.FC<VisitorListProps> = ({ visitors, events, onDelete, onEdit, onSendBirthday, onSendWelcome }) => {
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const todayISO = new Date().toISOString().split('T')[0];
 
   const handleWelcome = (visitor: Visitor) => {
-    whatsappService.sendWelcomeMessage(visitor, events);
+    onSendWelcome(visitor);
     setFeedbackId(visitor.id + '_welcome');
     setTimeout(() => setFeedbackId(null), 2000);
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'Nunca';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
   };
 
   return (
@@ -41,7 +48,8 @@ const VisitorList: React.FC<VisitorListProps> = ({ visitors, events, onDelete, o
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {visitors.map(visitor => {
-            const alreadySent = visitor.lastBirthdayWishedAt === todayISO;
+            const alreadySentBirthday = visitor.lastBirthdayWishedAt === todayISO;
+            const alreadySentWelcome = visitor.lastWelcomeSentAt === todayISO;
             const isSentSuccess = feedbackId === visitor.id + '_welcome';
 
             return (
@@ -50,17 +58,26 @@ const VisitorList: React.FC<VisitorListProps> = ({ visitors, events, onDelete, o
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black transition-colors ${isSentSuccess ? 'bg-green-500 text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
                     {isSentSuccess ? '✅' : visitor.name.charAt(0)}
                   </div>
-                  <button 
-                     onClick={() => onDelete(visitor.id)}
-                     className="bg-slate-50 hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all p-2 rounded-xl"
-                     title="Excluir"
-                  >
-                    🗑️
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                       onClick={() => onEdit(visitor)}
+                       className="bg-slate-50 hover:bg-blue-50 text-slate-300 hover:text-blue-600 transition-all p-2 rounded-xl border border-slate-100"
+                       title="Editar"
+                    >
+                      ✏️
+                    </button>
+                    <button 
+                       onClick={() => onDelete(visitor.id)}
+                       className="bg-slate-50 hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all p-2 rounded-xl border border-slate-100"
+                       title="Excluir"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
 
                 <h4 className="text-lg font-bold text-slate-800 mb-1">{visitor.name}</h4>
-                <div className="space-y-1 mb-6">
+                <div className="space-y-1 mb-4">
                   <p className="text-sm text-slate-500 flex items-center gap-2">
                     <span className="opacity-50">📞</span> {visitor.phone}
                   </p>
@@ -70,10 +87,25 @@ const VisitorList: React.FC<VisitorListProps> = ({ visitors, events, onDelete, o
                   <p className="text-xs text-slate-400 flex items-center gap-2 italic">
                     <span className="opacity-50">📍</span> {visitor.address || 'Endereço não informado'}
                   </p>
-                  <div className="pt-2 mt-2 border-t border-slate-50">
-                    <p className="text-[10px] text-slate-400 flex items-center gap-2 font-medium">
-                      <span className="opacity-50">📝</span> Cadastrado em: {new Date(visitor.registrationDate).toLocaleDateString('pt-BR')}
-                    </p>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-2xl mb-6 space-y-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Histórico de Contato</p>
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-slate-500">🙏 Agradecimento:</span>
+                    <span className={`font-bold ${visitor.lastWelcomeSentAt ? 'text-green-600' : 'text-slate-400'}`}>
+                      {formatDate(visitor.lastWelcomeSentAt)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-slate-500">🎂 Parabéns:</span>
+                    <span className={`font-bold ${visitor.lastBirthdayWishedAt ? 'text-blue-600' : 'text-slate-400'}`}>
+                      {formatDate(visitor.lastBirthdayWishedAt)}
+                    </span>
+                  </div>
+                  <div className="pt-1 mt-1 border-t border-slate-100 flex justify-between items-center text-[9px] text-slate-300">
+                    <span>📝 Cadastro:</span>
+                    <span>{new Date(visitor.registrationDate).toLocaleDateString('pt-BR')}</span>
                   </div>
                 </div>
 
@@ -81,24 +113,24 @@ const VisitorList: React.FC<VisitorListProps> = ({ visitors, events, onDelete, o
                   <button
                     onClick={() => handleWelcome(visitor)}
                     className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition-all flex items-center justify-center gap-2 shadow-lg ${
-                      isSentSuccess 
-                      ? 'bg-green-600 text-white animate-success' 
+                      alreadySentWelcome 
+                      ? 'bg-green-100 text-green-700 border border-green-200' 
                       : 'bg-green-500 hover:bg-green-600 text-white shadow-green-100'
                     }`}
                   >
-                    <span>{isSentSuccess ? '✅' : '🙏'}</span>
-                    <span>{isSentSuccess ? 'Enviado!' : 'Agradecer'}</span>
+                    <span>{isSentSuccess || alreadySentWelcome ? '✅' : '🙏'}</span>
+                    <span>{alreadySentWelcome ? 'Enviado' : 'Agradecer'}</span>
                   </button>
                   <button
-                    disabled={alreadySent}
+                    disabled={alreadySentBirthday}
                     onClick={() => onSendBirthday(visitor)}
                     className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition-all flex items-center justify-center gap-2 ${
-                      alreadySent 
+                      alreadySentBirthday 
                       ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
                       : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100'
                     }`}
                   >
-                    {alreadySent ? '✅ Enviado' : '🎂 Parabéns'}
+                    {alreadySentBirthday ? '✅ Enviado' : '🎂 Parabéns'}
                   </button>
                 </div>
               </div>
