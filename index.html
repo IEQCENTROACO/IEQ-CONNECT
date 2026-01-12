@@ -36,9 +36,9 @@
 <script type="importmap">
 {
   "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3"
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
@@ -204,6 +204,35 @@
             render();
         }
 
+        function saveUser(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            const newUser = {
+                id: crypto.randomUUID(),
+                name: data.name,
+                username: data.username.toLowerCase().trim(),
+                password: data.password,
+                role: data.role
+            };
+            
+            STATE.users.push(newUser);
+            saveData();
+            closeModal();
+            render();
+        }
+
+        function deleteUser(id) {
+            if (id === 'admin-001') return alert('O administrador principal não pode ser removido.');
+            if (id === STATE.currentUser.id) return alert('Você não pode remover seu próprio acesso enquanto estiver logado.');
+            if (!confirm('Deseja realmente remover o acesso deste usuário?')) return;
+            
+            STATE.users = STATE.users.filter(u => u.id !== id);
+            saveData();
+            render();
+        }
+
         // --- UI RENDERING ---
         function render() {
             const app = document.getElementById('app');
@@ -286,7 +315,7 @@
                 case 'birthdays': return renderBirthdays();
                 case 'events': return renderEvents();
                 case 'users': return renderUserManagement();
-                default: return 'Em desenvolvimento';
+                default: return renderDashboard();
             }
         }
 
@@ -304,8 +333,8 @@
                     <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div><h2 class="text-3xl font-bold text-slate-800">Paz do Senhor! 🙌</h2><p class="text-slate-500">IEQ CONNECT Dashboard</p></div>
                         <div class="flex gap-2">
-                            <button onclick="openForm('members')" class="bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg">➕ Novo Membro</button>
-                            <button onclick="openForm('visitors')" class="bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg">➕ Novo Visitante</button>
+                            <button onclick="openForm('members')" class="bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95">➕ Novo Membro</button>
+                            <button onclick="openForm('visitors')" class="bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95">➕ Novo Visitante</button>
                         </div>
                     </header>
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -320,7 +349,7 @@
                             ${birthdaysToday.length ? birthdaysToday.map(p => `
                                 <div class="flex items-center justify-between p-4 rounded-2xl bg-amber-50 mb-3 border border-amber-100">
                                     <p class="font-bold text-sm">${p.name}</p>
-                                    <button onclick="whatsapp.sendBirthday(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="px-3 py-1 bg-green-500 text-white rounded-lg text-xs font-bold">${p.lastBirthdayWishedAt === todayISO ? '✅ Enviado' : 'Parabenizar'}</button>
+                                    <button onclick="whatsapp.sendBirthday(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="px-3 py-1 bg-green-500 text-white rounded-lg text-xs font-bold transition-all active:scale-95">${p.lastBirthdayWishedAt === todayISO ? '✅ Enviado' : 'Parabenizar'}</button>
                                 </div>`).join('') : '<p class="text-center text-slate-400 py-6">Ninguém faz anos hoje.</p>'}
                         </div>
                         <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
@@ -340,7 +369,7 @@
         function renderStat(title, value, icon, color) {
             return `<div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-5">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${color}">${icon}</div>
-                <div><p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">${title}</p><p class="text-2xl font-black text-slate-800">${value}</p></div>
+                <div><p class="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">${title}</p><p class="text-2xl font-black text-slate-800">${value}</p></div>
             </div>`;
         }
 
@@ -352,7 +381,7 @@
                 <div class="space-y-6 fade-in">
                     <div class="flex justify-between items-center">
                         <div><h2 class="text-2xl font-bold text-slate-800">${title}</h2><p class="text-sm text-slate-500">Gestão completa da igreja.</p></div>
-                        <button onclick="openForm('${type}')" class="bg-blue-700 text-white px-4 py-2 rounded-xl font-bold">+ Novo</button>
+                        <button onclick="openForm('${type}')" class="bg-blue-700 text-white px-4 py-2 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-blue-100">+ Novo</button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${data.map(p => renderPersonCard(p, type)).join('')}
@@ -370,8 +399,8 @@
                     <div class="flex justify-between items-start mb-4">
                         <div class="w-12 h-12 bg-blue-50 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-xl">${p.name[0]}</div>
                         <div class="flex gap-2">
-                            <button onclick="editPerson('${type}', '${p.id}')" class="text-slate-300 hover:text-blue-600">✏️</button>
-                            <button onclick="deletePerson('${type}', '${p.id}')" class="text-slate-300 hover:text-red-500">🗑️</button>
+                            <button onclick="editPerson('${type}', '${p.id}')" class="text-slate-300 hover:text-blue-600 transition-colors">✏️</button>
+                            <button onclick="deletePerson('${type}', '${p.id}')" class="text-slate-300 hover:text-red-500 transition-colors">🗑️</button>
                         </div>
                     </div>
                     <h4 class="font-bold text-slate-800 mb-2">${p.name}</h4>
@@ -384,8 +413,8 @@
                         <div class="border-t pt-1 flex justify-between text-[9px] text-slate-400"><span>Registro:</span><span>${new Date(p.registrationDate).toLocaleDateString('pt-BR')}</span></div>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="sendWelcome('${type}', '${p.id}')" class="flex-1 py-2 bg-green-500 text-white rounded-xl text-[10px] font-bold uppercase ${p.lastWelcomeSentAt === today ? 'opacity-50' : ''}">${p.lastWelcomeSentAt === today ? 'Enviado ✅' : 'Agradecer'}</button>
-                        <button onclick="sendBirthday('${type}', '${p.id}')" class="flex-1 py-2 bg-blue-50 text-blue-700 rounded-xl text-[10px] font-bold uppercase ${p.lastBirthdayWishedAt === today ? 'opacity-50' : ''}">${p.lastBirthdayWishedAt === today ? 'Enviado ✅' : 'Parabéns'}</button>
+                        <button onclick="sendWelcome('${type}', '${p.id}')" class="flex-1 py-2 bg-green-500 text-white rounded-xl text-[10px] font-bold uppercase transition-all active:scale-95 ${p.lastWelcomeSentAt === today ? 'opacity-50' : ''}">${p.lastWelcomeSentAt === today ? 'Enviado ✅' : 'Agradecer'}</button>
+                        <button onclick="sendBirthday('${type}', '${p.id}')" class="flex-1 py-2 bg-blue-50 text-blue-700 rounded-xl text-[10px] font-bold uppercase transition-all active:scale-95 ${p.lastBirthdayWishedAt === today ? 'opacity-50' : ''}">${p.lastBirthdayWishedAt === today ? 'Enviado ✅' : 'Parabéns'}</button>
                     </div>
                 </div>
             `;
@@ -409,19 +438,19 @@
                         <div class="flex gap-2 bg-white p-1 rounded-xl shadow-sm border">
                             <button onclick="STATE.birthdayFilter='month'; render()" class="px-3 py-1 text-xs rounded-lg ${STATE.birthdayFilter==='month' ? 'bg-blue-700 text-white' : ''}">Mês</button>
                             <button onclick="STATE.birthdayFilter='today'; render()" class="px-3 py-1 text-xs rounded-lg ${STATE.birthdayFilter==='today' ? 'bg-blue-700 text-white' : ''}">Hoje</button>
-                            <select onchange="STATE.birthdayMonth=this.value; render()" class="text-xs font-bold outline-none">
+                            <select onchange="STATE.birthdayMonth=this.value; render()" class="text-xs font-bold outline-none bg-transparent px-2">
                                 ${['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m,i)=>`<option value="${i}" ${STATE.birthdayMonth==i?'selected':''}>${m}</option>`).join('')}
                             </select>
                         </div>
                     </header>
                     <div class="space-y-4">
                         ${filtered.length ? filtered.map(p => `
-                            <div class="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm">
+                            <div class="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
                                 <div class="flex items-center gap-4">
                                     <div class="w-12 h-12 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-lg">${new Date(p.birthDate).getDate()+1}</div>
                                     <div><h4 class="font-bold text-slate-800">${p.name}</h4><p class="text-xs text-slate-400">📞 ${p.phone}</p></div>
                                 </div>
-                                <button onclick="sendBirthday('${all.includes(p)?'visitors':'members'}','${p.id}')" class="px-4 py-2 bg-green-500 text-white rounded-xl text-xs font-bold">Enviar Parabéns</button>
+                                <button onclick="sendBirthday('${all.includes(p)?'visitors':'members'}','${p.id}')" class="px-4 py-2 bg-green-500 text-white rounded-xl text-xs font-bold transition-all active:scale-95">Enviar Parabéns</button>
                             </div>`).join('') : '<p class="text-center py-20 text-slate-400">Nenhum aniversariante encontrado.</p>'}
                     </div>
                 </div>
@@ -444,7 +473,43 @@
                             <textarea name="address" placeholder="Endereço" class="w-full p-3 bg-slate-50 border rounded-xl">${person.address}</textarea>
                             <div class="flex gap-4 pt-4">
                                 <button type="button" onclick="closeModal()" class="flex-1 font-bold text-slate-400">Cancelar</button>
-                                <button type="submit" class="flex-1 bg-blue-700 text-white p-3 rounded-xl font-bold">Salvar</button>
+                                <button type="submit" class="flex-1 bg-blue-700 text-white p-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-blue-100">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function openUserForm() {
+            const container = document.getElementById('modal-container');
+            container.innerHTML = `
+                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden fade-in">
+                        <div class="bg-indigo-700 p-6 text-white text-center"><h3 class="text-2xl font-bold">Novo Operador</h3></div>
+                        <form onsubmit="saveUser(event)" class="p-8 space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
+                                <input name="name" required placeholder="Ex: Lucas Silva" class="w-full p-3 bg-slate-50 border rounded-xl">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Login (Usuário)</label>
+                                <input name="username" required placeholder="Ex: lucas.ieq" class="w-full p-3 bg-slate-50 border rounded-xl">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Senha de Acesso</label>
+                                <input name="password" required type="text" placeholder="Defina a senha inicial" class="w-full p-3 bg-slate-50 border rounded-xl">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nível de Acesso</label>
+                                <select name="role" class="w-full p-3 bg-slate-50 border rounded-xl">
+                                    <option value="MEMBER">Membro (Operacional)</option>
+                                    <option value="ADMIN">Administrador (Total)</option>
+                                </select>
+                            </div>
+                            <div class="flex gap-4 pt-4">
+                                <button type="button" onclick="closeModal()" class="flex-1 font-bold text-slate-400">Cancelar</button>
+                                <button type="submit" class="flex-1 bg-indigo-700 text-white p-3 rounded-xl font-bold transition-all active:scale-95">Criar Acesso</button>
                             </div>
                         </form>
                     </div>
@@ -470,7 +535,7 @@
                         <form onsubmit="handleLogin(event)" class="p-10 space-y-6">
                             <input name="username" required placeholder="Usuário" class="w-full p-4 bg-slate-50 border rounded-2xl font-bold">
                             <input name="password" type="password" required placeholder="Senha" class="w-full p-4 bg-slate-50 border rounded-2xl font-bold">
-                            <button type="submit" class="w-full bg-blue-700 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-blue-200">Entrar</button>
+                            <button type="submit" class="w-full bg-blue-700 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-blue-200 transition-all active:scale-95">Entrar</button>
                         </form>
                     </div>
                 </div>
@@ -487,7 +552,7 @@
                             <input name="username" required placeholder="Usuário" class="w-full p-3 border rounded-xl" value="${STATE.currentUser.username}">
                             <input name="password" type="password" required placeholder="Nova Senha" class="w-full p-3 border rounded-xl">
                             <input name="confirmPassword" type="password" required placeholder="Confirme a Senha" class="w-full p-3 border rounded-xl">
-                            <button type="submit" class="w-full bg-blue-700 text-white py-3 rounded-xl font-bold shadow-lg">Salvar e Acessar</button>
+                            <button type="submit" class="w-full bg-blue-700 text-white py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95">Salvar e Acessar</button>
                         </form>
                     </div>
                 </div>
@@ -502,7 +567,7 @@
                     </header>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         ${STATE.events.map(e => `
-                            <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                            <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
                                 <div class="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase inline-block mb-4">${e.dayOfWeek}</div>
                                 <div class="flex items-center gap-3 mb-4">
                                     <span class="text-3xl">${e.icon}</span><h3 class="text-xl font-bold">${e.title}</h3>
@@ -516,16 +581,26 @@
         }
 
         function renderUserManagement() {
+            if (STATE.currentUser.role !== 'ADMIN') return '<p class="text-center py-20">Acesso Negado</p>';
+            
             return `
                 <div class="space-y-8 fade-in">
-                    <header class="flex justify-between items-center">
-                        <h2 class="text-3xl font-bold text-slate-800">Usuários do Sistema</h2>
+                    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div><h2 class="text-3xl font-bold text-slate-800">Membros da Equipe</h2><p class="text-slate-500">Apenas administradores podem gerenciar acessos.</p></div>
+                        <button onclick="openUserForm()" class="bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all active:scale-95">➕ Novo Operador</button>
                     </header>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${STATE.users.map(u => `
-                            <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative">
-                                <span class="absolute top-2 right-2 text-[8px] bg-amber-500 text-white px-2 py-0.5 rounded">${u.role}</span>
-                                <h4 class="font-bold">${u.name}</h4><p class="text-xs text-slate-400">@${u.username}</p>
+                            <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden group">
+                                <span class="absolute top-2 right-2 text-[8px] bg-amber-500 text-white px-2 py-0.5 rounded font-black uppercase tracking-tighter">${u.role}</span>
+                                <div class="flex items-center gap-4 mb-4">
+                                    <div class="w-12 h-12 bg-indigo-50 text-indigo-700 rounded-2xl flex items-center justify-center font-bold text-xl">${u.name[0]}</div>
+                                    <div><h4 class="font-bold text-slate-800">${u.name}</h4><p class="text-xs text-slate-400">@${u.username}</p></div>
+                                </div>
+                                <div class="pt-4 border-t border-slate-50 flex justify-between items-center">
+                                    <span class="text-[10px] text-slate-400 font-medium">Senha: ${u.password}</span>
+                                    ${u.id !== 'admin-001' ? `<button onclick="deleteUser('${u.id}')" class="text-red-400 hover:text-red-600 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Remover</button>` : ''}
+                                </div>
                             </div>`).join('')}
                     </div>
                 </div>
