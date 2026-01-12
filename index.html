@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IEQ CONNECT</title>
+    <title>IEQ CONNECT - Gestão de Membros e Visitantes</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
         
@@ -19,18 +19,19 @@
         }
         
         @keyframes success-glow {
-            0% { border-color: transparent; }
+            0% { border-color: #f1f5f9; }
             50% { border-color: #22c55e; background-color: #f0fdf4; }
-            100% { border-color: transparent; }
+            100% { border-color: #f1f5f9; }
         }
 
-        .animate-success {
-            animation: success-pulse 0.6s ease-out;
-        }
+        .animate-success { animation: success-pulse 0.6s ease-out; }
+        .animate-glow { animation: success-glow 2s ease-in-out; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .animate-glow {
-            animation: success-glow 2s ease-in-out;
-        }
+        /* Hide scrollbar but keep functionality */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 <script type="importmap">
 {
@@ -42,7 +43,496 @@
 }
 </script>
 </head>
-<body class="bg-slate-50 text-slate-900">
-    <div id="root"></div>
+<body class="bg-slate-50 text-slate-900 overflow-x-hidden">
+    <div id="app"></div>
+
+    <script>
+        // --- DATA & STATE ---
+        const STATE = {
+            currentUser: null,
+            view: 'dashboard',
+            visitors: [],
+            members: [],
+            events: [],
+            users: [],
+            editingId: null,
+            birthdayFilter: 'month',
+            birthdayMonth: new Date().getMonth()
+        };
+
+        const INITIAL_EVENTS = [
+            { id: '1', title: 'Culto de Celebração (Manhã)', dayOfWeek: 'Domingo', time: '09:00', icon: '⛪', description: 'Nossa primeira celebração do dia, começando a manhã na presença do Senhor.' },
+            { id: '1.5', title: 'Culto da Família (Noite)', dayOfWeek: 'Domingo', time: '19:00', icon: '🏠', description: 'Um momento especial para toda a família se reunir em adoração.' },
+            { id: '2', title: 'Culto de Ensino', dayOfWeek: 'Quarta-feira', time: '20:00', icon: '📖', description: 'Aprofundando no conhecimento da Palavra de Deus.' },
+            { id: '3', title: 'Reunião de Jovens', dayOfWeek: 'Sábado', time: '19:30', icon: '⚡', description: 'Comunhão, louvor e palavra para a juventude.' },
+        ];
+
+        const STORAGE_KEYS = {
+            VISITORS: 'ieq_connect_visitors',
+            MEMBERS: 'ieq_connect_members',
+            EVENTS: 'ieq_connect_events',
+            USERS: 'ieq_connect_users',
+            SESSION: 'ieq_connect_session'
+        };
+
+        // --- CORE FUNCTIONS ---
+        function init() {
+            loadData();
+            const session = localStorage.getItem(STORAGE_KEYS.SESSION);
+            if (session) {
+                STATE.currentUser = JSON.parse(session);
+            }
+            render();
+        }
+
+        function loadData() {
+            STATE.visitors = JSON.parse(localStorage.getItem(STORAGE_KEYS.VISITORS) || '[]');
+            STATE.members = JSON.parse(localStorage.getItem(STORAGE_KEYS.MEMBERS) || '[]');
+            STATE.events = JSON.parse(localStorage.getItem(STORAGE_KEYS.EVENTS) || JSON.stringify(INITIAL_EVENTS));
+            STATE.users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || JSON.stringify([{
+                id: 'admin-001', username: 'admin', password: 'admin', name: 'Administrador IEQ', role: 'ADMIN', mustChangePassword: true
+            }]));
+        }
+
+        function saveData() {
+            localStorage.setItem(STORAGE_KEYS.VISITORS, JSON.stringify(STATE.visitors));
+            localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(STATE.members));
+            localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(STATE.events));
+            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(STATE.users));
+        }
+
+        function setView(view) {
+            STATE.view = view;
+            window.scrollTo(0,0);
+            render();
+        }
+
+        // --- AUTH ---
+        function handleLogin(e) {
+            e.preventDefault();
+            const user = STATE.users.find(u => u.username === e.target.username.value && u.password === e.target.password.value);
+            if (user) {
+                STATE.currentUser = user;
+                localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+                render();
+            } else {
+                alert('Usuário ou senha incorretos.');
+            }
+        }
+
+        function handleLogout() {
+            STATE.currentUser = null;
+            localStorage.removeItem(STORAGE_KEYS.SESSION);
+            render();
+        }
+
+        function handleForceChangePassword(e) {
+            e.preventDefault();
+            const pwd = e.target.password.value;
+            if (pwd !== e.target.confirmPassword.value) return alert('Senhas não coincidem');
+            
+            const user = STATE.users.find(u => u.id === STATE.currentUser.id);
+            user.name = e.target.name.value;
+            user.username = e.target.username.value.toLowerCase().trim();
+            user.password = pwd;
+            user.mustChangePassword = false;
+            
+            STATE.currentUser = user;
+            saveData();
+            localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+            render();
+        }
+
+        // --- WHATSAPP SERVICE ---
+        const whatsapp = {
+            formatPhone: (p) => p.replace(/\D/g, ''),
+            sendWelcome: (person) => {
+                const agenda = STATE.events.map(e => `📍 *${e.title}*\n📅 ${e.dayOfWeek} às ${e.time}\n_${e.description}_`).join('\n\n');
+                const msg = `Paz do Senhor, *${person.name}*! ✨\n\nÉ com imensa alegria que a família *IEQ* agradece sua visita! Sua presença foi um presente de Deus.\n\nNossa Agenda:\n\n${agenda}`;
+                const url = `https://wa.me/55${whatsapp.formatPhone(person.phone)}?text=${encodeURIComponent(msg)}`;
+                
+                const today = new Date().toISOString().split('T')[0];
+                person.lastWelcomeSentAt = today;
+                saveData();
+                render();
+                window.open(url, '_blank');
+            },
+            sendBirthday: (person) => {
+                const msg = `Olá, *${person.name}*! 🎉🎂\n\nA família *IEQ* deseja um Feliz Aniversário! Que o Senhor Jesus derrame bênçãos sobre você!`;
+                const url = `https://wa.me/55${whatsapp.formatPhone(person.phone)}?text=${encodeURIComponent(msg)}`;
+                
+                const today = new Date().toISOString().split('T')[0];
+                person.lastBirthdayWishedAt = today;
+                saveData();
+                render();
+                window.open(url, '_blank');
+            }
+        };
+
+        // --- CRUD LOGIC ---
+        function deletePerson(type, id) {
+            if (!confirm('Deseja excluir este registro?')) return;
+            STATE[type] = STATE[type].filter(p => p.id !== id);
+            saveData();
+            render();
+        }
+
+        function savePerson(type, e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            if (STATE.editingId) {
+                const index = STATE[type].findIndex(p => p.id === STATE.editingId);
+                STATE[type][index] = { ...STATE[type][index], ...data };
+            } else {
+                const newPerson = {
+                    ...data,
+                    id: crypto.randomUUID(),
+                    registrationDate: new Date().toISOString()
+                };
+                STATE[type].push(newPerson);
+                if (type === 'visitors') {
+                    setTimeout(() => {
+                        if (confirm(`Visitante ${newPerson.name} cadastrado! Enviar boas-vindas?`)) whatsapp.sendWelcome(newPerson);
+                    }, 500);
+                }
+            }
+            STATE.editingId = null;
+            saveData();
+            closeModal();
+            render();
+        }
+
+        // --- UI RENDERING ---
+        function render() {
+            const app = document.getElementById('app');
+            if (!STATE.currentUser) {
+                app.innerHTML = renderLogin();
+                return;
+            }
+            if (STATE.currentUser.mustChangePassword) {
+                app.innerHTML = renderForcePassword();
+                return;
+            }
+
+            app.innerHTML = `
+                <div class="min-h-screen flex flex-col md:flex-row">
+                    ${renderSidebar()}
+                    ${renderMobileHeader()}
+                    <main class="flex-1 p-4 md:p-10 overflow-y-auto bg-slate-50">
+                        <div class="max-w-6xl mx-auto">
+                            ${renderViewContent()}
+                        </div>
+                    </main>
+                </div>
+                <div id="modal-container"></div>
+            `;
+        }
+
+        function renderSidebar() {
+            const isAdmin = STATE.currentUser.role === 'ADMIN';
+            const nav = (view, icon, label) => `
+                <button onclick="setView('${view}')" class="w-full flex items-center space-x-4 px-5 py-4 rounded-[1.25rem] transition-all ${STATE.view === view ? 'bg-amber-500 text-blue-900 font-black shadow-xl scale-[1.02]' : 'hover:bg-blue-800 text-blue-100 font-semibold opacity-70 hover:opacity-100'}">
+                    <span class="text-xl">${icon}</span>
+                    <span class="text-sm">${label}</span>
+                </button>
+            `;
+            return `
+                <aside class="hidden md:flex flex-col w-72 bg-blue-900 text-white p-6 shadow-xl">
+                    <div class="mb-10 flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-lg rotate-3">I</div>
+                        <h1 class="text-2xl font-black tracking-tight leading-none">IEQ<br/><span class="text-sm font-medium opacity-60">CONNECT</span></h1>
+                    </div>
+                    <nav class="flex-1 space-y-2">
+                        ${nav('dashboard', '📊', 'Dashboard')}
+                        ${nav('members', '⛪', 'Membros')}
+                        ${nav('visitors', '👥', 'Visitantes')}
+                        ${nav('birthdays', '🎂', 'Aniversariantes')}
+                        ${nav('events', '📅', 'Agenda IEQ')}
+                        ${isAdmin ? `<div class="pt-4 mt-4 border-t border-blue-800">${nav('users', '🛡️', 'Usuários')}</div>` : ''}
+                    </nav>
+                    <div class="mt-auto pt-6 border-t border-blue-800 flex flex-col gap-4">
+                        <div class="flex items-center gap-3 px-2">
+                            <div class="w-10 h-10 rounded-full bg-blue-700 flex items-center justify-center font-bold text-amber-400">${STATE.currentUser.name[0]}</div>
+                            <div><p class="text-sm font-bold">${STATE.currentUser.name}</p><p class="text-[10px] uppercase font-black text-amber-500">${STATE.currentUser.role}</p></div>
+                        </div>
+                        <button onclick="handleLogout()" class="w-full flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 py-3 rounded-xl font-bold transition-all text-sm">🚪 Sair</button>
+                    </div>
+                </aside>
+            `;
+        }
+
+        function renderMobileHeader() {
+            const isAdmin = STATE.currentUser.role === 'ADMIN';
+            const btn = (view, icon) => `<button class="p-2 rounded-xl ${STATE.view === view ? 'bg-amber-500 text-blue-900' : ''}" onclick="setView('${view}')">${icon}</button>`;
+            return `
+                <header class="md:hidden bg-blue-900 text-white p-4 flex justify-between items-center sticky top-0 z-50 shadow-lg">
+                    <div class="flex items-center gap-2"><div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center font-bold">I</div><h1 class="text-lg font-black">IEQ CONNECT</h1></div>
+                    <div class="flex space-x-1">
+                        ${btn('dashboard', '📊')}${btn('members', '⛪')}${btn('visitors', '👥')}${btn('events', '📅')}
+                        ${isAdmin ? btn('users', '🛡️') : ''}
+                        <button class="p-2 rounded-xl text-red-400 bg-red-400/10" onclick="handleLogout()">🚪</button>
+                    </div>
+                </header>
+            `;
+        }
+
+        function renderViewContent() {
+            switch(STATE.view) {
+                case 'dashboard': return renderDashboard();
+                case 'members': return renderPersonList('members');
+                case 'visitors': return renderPersonList('visitors');
+                case 'birthdays': return renderBirthdays();
+                case 'events': return renderEvents();
+                case 'users': return renderUserManagement();
+                default: return 'Em desenvolvimento';
+            }
+        }
+
+        // --- DASHBOARD ---
+        function renderDashboard() {
+            const todayISO = new Date().toISOString().split('T')[0];
+            const birthdaysToday = [...STATE.members, ...STATE.visitors].filter(p => {
+                const b = new Date(p.birthDate);
+                const adj = new Date(b.getTime() + b.getTimezoneOffset() * 60000);
+                return adj.getDate() === new Date().getDate() && adj.getMonth() === new Date().getMonth();
+            });
+
+            return `
+                <div class="space-y-8 fade-in">
+                    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div><h2 class="text-3xl font-bold text-slate-800">Paz do Senhor! 🙌</h2><p class="text-slate-500">IEQ CONNECT Dashboard</p></div>
+                        <div class="flex gap-2">
+                            <button onclick="openForm('members')" class="bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg">➕ Novo Membro</button>
+                            <button onclick="openForm('visitors')" class="bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg">➕ Novo Visitante</button>
+                        </div>
+                    </header>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        ${renderStat('Membros', STATE.members.length, '⛪', 'bg-indigo-100 text-indigo-700')}
+                        ${renderStat('Visitantes', STATE.visitors.length, '👥', 'bg-blue-100 text-blue-700')}
+                        ${renderStat('Eventos', STATE.events.length, '📅', 'bg-purple-100 text-purple-700')}
+                        ${renderStat('Total', STATE.members.length + STATE.visitors.length, '✨', 'bg-green-100 text-green-700')}
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                            <h3 class="text-xl font-bold mb-6 flex items-center gap-2">🎉 Aniversariantes de Hoje</h3>
+                            ${birthdaysToday.length ? birthdaysToday.map(p => `
+                                <div class="flex items-center justify-between p-4 rounded-2xl bg-amber-50 mb-3 border border-amber-100">
+                                    <p class="font-bold text-sm">${p.name}</p>
+                                    <button onclick="whatsapp.sendBirthday(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="px-3 py-1 bg-green-500 text-white rounded-lg text-xs font-bold">${p.lastBirthdayWishedAt === todayISO ? '✅ Enviado' : 'Parabenizar'}</button>
+                                </div>`).join('') : '<p class="text-center text-slate-400 py-6">Ninguém faz anos hoje.</p>'}
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                            <h3 class="text-xl font-bold mb-6 flex items-center gap-2">📅 Agenda Próxima</h3>
+                            ${STATE.events.slice(0,3).map(e => `<div class="flex gap-4 p-4 border-b border-slate-50">
+                                <div class="bg-blue-100 text-blue-700 p-2 rounded-xl font-bold text-center w-16 h-12 flex flex-col justify-center">
+                                    <span class="text-[10px] uppercase">${e.dayOfWeek.substring(0,3)}</span><span class="text-sm">${e.time}</span>
+                                </div>
+                                <div><h4 class="font-bold text-sm">${e.title}</h4><p class="text-[10px] text-slate-500">${e.description}</p></div>
+                            </div>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStat(title, value, icon, color) {
+            return `<div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-5">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${color}">${icon}</div>
+                <div><p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">${title}</p><p class="text-2xl font-black text-slate-800">${value}</p></div>
+            </div>`;
+        }
+
+        // --- LISTS ---
+        function renderPersonList(type) {
+            const data = STATE[type];
+            const title = type === 'members' ? 'Membros' : 'Visitantes';
+            return `
+                <div class="space-y-6 fade-in">
+                    <div class="flex justify-between items-center">
+                        <div><h2 class="text-2xl font-bold text-slate-800">${title}</h2><p class="text-sm text-slate-500">Gestão completa da igreja.</p></div>
+                        <button onclick="openForm('${type}')" class="bg-blue-700 text-white px-4 py-2 rounded-xl font-bold">+ Novo</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        ${data.map(p => renderPersonCard(p, type)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPersonCard(p, type) {
+            const today = new Date().toISOString().split('T')[0];
+            const fmt = (d) => d ? d.split('-').reverse().join('/') : 'Nunca';
+            const bday = new Date(p.birthDate).toLocaleDateString('pt-BR');
+            return `
+                <div class="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl transition-all group">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="w-12 h-12 bg-blue-50 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-xl">${p.name[0]}</div>
+                        <div class="flex gap-2">
+                            <button onclick="editPerson('${type}', '${p.id}')" class="text-slate-300 hover:text-blue-600">✏️</button>
+                            <button onclick="deletePerson('${type}', '${p.id}')" class="text-slate-300 hover:text-red-500">🗑️</button>
+                        </div>
+                    </div>
+                    <h4 class="font-bold text-slate-800 mb-2">${p.name}</h4>
+                    <div class="text-xs text-slate-500 space-y-1 mb-4">
+                        <p>📞 ${p.phone}</p><p>🎂 ${bday}</p><p class="italic">📍 ${p.address || 'Não informado'}</p>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-2xl mb-4 text-[10px] space-y-1">
+                        <div class="flex justify-between"><span>Agradecimento:</span><span class="font-bold text-green-600">${fmt(p.lastWelcomeSentAt)}</span></div>
+                        <div class="flex justify-between"><span>Parabéns:</span><span class="font-bold text-blue-600">${fmt(p.lastBirthdayWishedAt)}</span></div>
+                        <div class="border-t pt-1 flex justify-between text-[9px] text-slate-400"><span>Registro:</span><span>${new Date(p.registrationDate).toLocaleDateString('pt-BR')}</span></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="sendWelcome('${type}', '${p.id}')" class="flex-1 py-2 bg-green-500 text-white rounded-xl text-[10px] font-bold uppercase ${p.lastWelcomeSentAt === today ? 'opacity-50' : ''}">${p.lastWelcomeSentAt === today ? 'Enviado ✅' : 'Agradecer'}</button>
+                        <button onclick="sendBirthday('${type}', '${p.id}')" class="flex-1 py-2 bg-blue-50 text-blue-700 rounded-xl text-[10px] font-bold uppercase ${p.lastBirthdayWishedAt === today ? 'opacity-50' : ''}">${p.lastBirthdayWishedAt === today ? 'Enviado ✅' : 'Parabéns'}</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- BIRTHDAYS ---
+        function renderBirthdays() {
+            const all = [...STATE.members, ...STATE.visitors];
+            const filtered = all.filter(p => {
+                const b = new Date(p.birthDate);
+                const adj = new Date(b.getTime() + b.getTimezoneOffset() * 60000);
+                if (STATE.birthdayFilter === 'month') return adj.getMonth() === parseInt(STATE.birthdayMonth);
+                if (STATE.birthdayFilter === 'today') return adj.getMonth() === new Date().getMonth() && adj.getDate() === new Date().getDate();
+                return true;
+            });
+
+            return `
+                <div class="space-y-8 fade-in">
+                    <header class="flex justify-between items-end">
+                        <h2 class="text-3xl font-bold">Celebrando Vidas</h2>
+                        <div class="flex gap-2 bg-white p-1 rounded-xl shadow-sm border">
+                            <button onclick="STATE.birthdayFilter='month'; render()" class="px-3 py-1 text-xs rounded-lg ${STATE.birthdayFilter==='month' ? 'bg-blue-700 text-white' : ''}">Mês</button>
+                            <button onclick="STATE.birthdayFilter='today'; render()" class="px-3 py-1 text-xs rounded-lg ${STATE.birthdayFilter==='today' ? 'bg-blue-700 text-white' : ''}">Hoje</button>
+                            <select onchange="STATE.birthdayMonth=this.value; render()" class="text-xs font-bold outline-none">
+                                ${['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m,i)=>`<option value="${i}" ${STATE.birthdayMonth==i?'selected':''}>${m}</option>`).join('')}
+                            </select>
+                        </div>
+                    </header>
+                    <div class="space-y-4">
+                        ${filtered.length ? filtered.map(p => `
+                            <div class="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-lg">${new Date(p.birthDate).getDate()+1}</div>
+                                    <div><h4 class="font-bold text-slate-800">${p.name}</h4><p class="text-xs text-slate-400">📞 ${p.phone}</p></div>
+                                </div>
+                                <button onclick="sendBirthday('${all.includes(p)?'visitors':'members'}','${p.id}')" class="px-4 py-2 bg-green-500 text-white rounded-xl text-xs font-bold">Enviar Parabéns</button>
+                            </div>`).join('') : '<p class="text-center py-20 text-slate-400">Nenhum aniversariante encontrado.</p>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- FORMS & MODALS ---
+        function openForm(type, id = null) {
+            STATE.editingId = id;
+            const person = id ? STATE[type].find(p => p.id === id) : { name: '', phone: '', birthDate: '', address: '' };
+            const container = document.getElementById('modal-container');
+            container.innerHTML = `
+                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden fade-in">
+                        <div class="bg-blue-700 p-6 text-white text-center"><h3 class="text-2xl font-bold">${id ? 'Editar' : 'Novo'} ${type==='members'?'Membro':'Visitante'}</h3></div>
+                        <form onsubmit="savePerson('${type}', event)" class="p-8 space-y-4">
+                            <input name="name" required placeholder="Nome Completo" class="w-full p-3 bg-slate-50 border rounded-xl" value="${person.name}">
+                            <input name="phone" required placeholder="WhatsApp" class="w-full p-3 bg-slate-50 border rounded-xl" value="${person.phone}">
+                            <input name="birthDate" type="date" required class="w-full p-3 bg-slate-50 border rounded-xl" value="${person.birthDate}">
+                            <textarea name="address" placeholder="Endereço" class="w-full p-3 bg-slate-50 border rounded-xl">${person.address}</textarea>
+                            <div class="flex gap-4 pt-4">
+                                <button type="button" onclick="closeModal()" class="flex-1 font-bold text-slate-400">Cancelar</button>
+                                <button type="submit" class="flex-1 bg-blue-700 text-white p-3 rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function closeModal() { document.getElementById('modal-container').innerHTML = ''; }
+        function editPerson(type, id) { openForm(type, id); }
+        function sendWelcome(type, id) { const p = STATE[type].find(x=>x.id===id); whatsapp.sendWelcome(p); }
+        function sendBirthday(type, id) { const p = STATE[type].find(x=>x.id===id); whatsapp.sendBirthday(p); }
+
+        // --- AUTH FORMS ---
+        function renderLogin() {
+            return `
+                <div class="min-h-screen bg-blue-900 flex items-center justify-center p-4">
+                    <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden fade-in">
+                        <div class="bg-gradient-to-br from-blue-700 to-indigo-800 p-10 text-white text-center">
+                            <div class="w-20 h-20 bg-amber-500 rounded-2xl mx-auto flex items-center justify-center font-bold text-4xl mb-4 shadow-lg rotate-3">I</div>
+                            <h1 class="text-3xl font-black">IEQ CONNECT</h1>
+                            <p class="text-blue-100 opacity-80 mt-2">Acesso Restrito</p>
+                        </div>
+                        <form onsubmit="handleLogin(event)" class="p-10 space-y-6">
+                            <input name="username" required placeholder="Usuário" class="w-full p-4 bg-slate-50 border rounded-2xl font-bold">
+                            <input name="password" type="password" required placeholder="Senha" class="w-full p-4 bg-slate-50 border rounded-2xl font-bold">
+                            <button type="submit" class="w-full bg-blue-700 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-blue-200">Entrar</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderForcePassword() {
+            return `
+                <div class="fixed inset-0 bg-blue-900 flex items-center justify-center p-4">
+                    <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 fade-in">
+                        <div class="text-center mb-6"><div class="text-4xl mb-2">🔐</div><h2 class="text-2xl font-black">Personalize seu Acesso</h2></div>
+                        <form onsubmit="handleForceChangePassword(event)" class="space-y-4">
+                            <input name="name" required placeholder="Seu Nome" class="w-full p-3 border rounded-xl" value="${STATE.currentUser.name}">
+                            <input name="username" required placeholder="Usuário" class="w-full p-3 border rounded-xl" value="${STATE.currentUser.username}">
+                            <input name="password" type="password" required placeholder="Nova Senha" class="w-full p-3 border rounded-xl">
+                            <input name="confirmPassword" type="password" required placeholder="Confirme a Senha" class="w-full p-3 border rounded-xl">
+                            <button type="submit" class="w-full bg-blue-700 text-white py-3 rounded-xl font-bold shadow-lg">Salvar e Acessar</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderEvents() {
+            return `
+                <div class="space-y-8 fade-in">
+                    <header class="flex justify-between items-center">
+                        <div><h2 class="text-3xl font-bold text-slate-800">Agenda IEQ</h2><p class="text-slate-500">Programação semanal oficial.</p></div>
+                    </header>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        ${STATE.events.map(e => `
+                            <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                                <div class="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase inline-block mb-4">${e.dayOfWeek}</div>
+                                <div class="flex items-center gap-3 mb-4">
+                                    <span class="text-3xl">${e.icon}</span><h3 class="text-xl font-bold">${e.title}</h3>
+                                </div>
+                                <div class="bg-slate-50 p-2 rounded-lg text-sm font-bold mb-4">🕒 ${e.time}</div>
+                                <p class="text-xs text-slate-500 italic">"${e.description}"</p>
+                            </div>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderUserManagement() {
+            return `
+                <div class="space-y-8 fade-in">
+                    <header class="flex justify-between items-center">
+                        <h2 class="text-3xl font-bold text-slate-800">Usuários do Sistema</h2>
+                    </header>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        ${STATE.users.map(u => `
+                            <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative">
+                                <span class="absolute top-2 right-2 text-[8px] bg-amber-500 text-white px-2 py-0.5 rounded">${u.role}</span>
+                                <h4 class="font-bold">${u.name}</h4><p class="text-xs text-slate-400">@${u.username}</p>
+                            </div>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        init();
+    </script>
 </body>
 </html>
